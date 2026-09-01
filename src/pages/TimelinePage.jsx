@@ -77,11 +77,11 @@ export default function TimelinePage() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="font-pixel text-cream text-base glow-pink mb-1">your timeline</h1>
+        <h1 className="font-pixel text-center text-cream text-xl glow-pink mb-4">Your Timeline</h1>
         {user && (
-          <p className="font-mono text-sage text-xs mt-1 opacity-70">● {user.email}</p>
+          <p className="font-mono text-center text-sage text-xs mt-1 opacity-70 mb-3">● {user.email}</p>
         )}
-        <p className="font-mono text-dusty text-xs mt-2">
+        <p className="font-mono text-right text-dusty text-xs mt-2">
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'} in your diary
         </p>
         <div className="h-px bg-gradient-to-r from-blush/60 to-transparent mt-3" />
