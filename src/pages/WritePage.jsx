@@ -1,7 +1,9 @@
-import { useState, useRef, useEffect } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import TextareaAutosize from 'react-textarea-autosize'
+import { supabase } from '../lib/supabase'
+import { useAuth } from '../context/AuthContext'
 
 const MOODS = [
   { emoji: '✨', label: 'magical' },
@@ -18,8 +20,8 @@ const MOODS = [
 
 const PROMPTS = [
   'what happened today that you keep thinking about?',
-  'how did your body feel today?',
-  'what did you say that you wish you hadn\'t?',
+  "how did your body feel today?",
+  "what did you say that you wish you hadn't?",
   'what are you not saying out loud?',
   'describe today in three words, then explain why.',
   'who took up space in your mind today?',
@@ -34,9 +36,12 @@ function getDateString() {
 
 export default function WritePage() {
   const navigate = useNavigate()
+  const { user } = useAuth()
   const [content, setContent] = useState('')
   const [selectedMood, setSelectedMood] = useState(null)
   const [saved, setSaved] = useState(false)
+  const [saving, setSaving] = useState(false)
+  const [error, setError] = useState('')
   const [wordCount, setWordCount] = useState(0)
   const [prompt, setPrompt] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
@@ -46,7 +51,6 @@ export default function WritePage() {
     setPrompt(PROMPTS[Math.floor(Math.random() * PROMPTS.length)])
   }, [])
 
-  // Typewriter effect: increment charIndex every 30ms while prompt is showing
   useEffect(() => {
     if (showPrompt && charIndex < prompt.length) {
       const timeout = setTimeout(() => setCharIndex(i => i + 1), 30)
@@ -54,23 +58,45 @@ export default function WritePage() {
     }
   }, [showPrompt, charIndex, prompt])
 
-  // Count words live as user types
   useEffect(() => {
     const words = content.trim().split(/\s+/).filter(w => w.length > 0)
     setWordCount(content.trim() ? words.length : 0)
   }, [content])
 
-  const handleSave = () => {
+  const handleSave = async () => {
     if (!content.trim()) return
-    const entry = {
-      id: Date.now().toString(),
-      content,
-      mood: selectedMood,
-      createdAt: new Date().toISOString(),
+    setSaving(true)
+    setError('')
+
+    if (user) {
+      // User is logged in — save to Supabase
+      const { error } = await supabase
+        .from('entries')
+        .insert({
+          user_id: user.id,
+          content: content.trim(),
+          mood_emoji: selectedMood?.emoji || null,
+          mood_label: selectedMood?.label || null,
+        })
+
+      if (error) {
+        setError('something went wrong saving. try again.')
+        setSaving(false)
+        return
+      }
+    } else {
+      // Not logged in — fall back to localStorage
+      const entry = {
+        id: Date.now().toString(),
+        content,
+        mood: selectedMood,
+        createdAt: new Date().toISOString(),
+      }
+      const existing = JSON.parse(localStorage.getItem('dear-brain-entries') || '[]')
+      localStorage.setItem('dear-brain-entries', JSON.stringify([entry, ...existing]))
     }
-    // Save to localStorage for now — Week 2 replaces this with Supabase
-    const existing = JSON.parse(localStorage.getItem('dear-brain-entries') || '[]')
-    localStorage.setItem('dear-brain-entries', JSON.stringify([entry, ...existing]))
+
+    setSaving(false)
     setSaved(true)
     setTimeout(() => navigate('/timeline'), 1800)
   }
@@ -82,7 +108,14 @@ export default function WritePage() {
         <button onClick={() => navigate('/')} className="font-pixel text-dusty text-xs hover:text-cream transition-colors">
           {'<'} back
         </button>
-        <span className="font-pixel text-dusty text-xs opacity-60">{getDateString()}</span>
+        <div className="flex items-center gap-3">
+          {user && (
+            <span className="font-mono text-sage text-xs opacity-70">
+              ● syncing to cloud
+            </span>
+          )}
+          <span className="font-pixel text-dusty text-xs opacity-60">{getDateString()}</span>
+        </div>
       </div>
 
       <motion.div className="mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.1 }}>
@@ -92,7 +125,6 @@ export default function WritePage() {
         <div className="h-px bg-gradient-to-r from-blush/60 to-transparent mt-3" />
       </motion.div>
 
-      {/* Mood selector */}
       <motion.div className="mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
         <p className="font-pixel text-dusty text-xs mb-3 opacity-70">{'>'} how are you feeling?</p>
         <div className="flex flex-wrap gap-2">
@@ -114,7 +146,6 @@ export default function WritePage() {
         </div>
       </motion.div>
 
-      {/* Prompt */}
       <motion.div className="mb-4" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
         <button
           onClick={() => { setShowPrompt(true); setCharIndex(0) }}
@@ -137,10 +168,8 @@ export default function WritePage() {
         </AnimatePresence>
       </motion.div>
 
-      {/* Diary textarea with paper texture */}
       <motion.div className="relative mb-6" initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.35 }}>
         <div className="paper-texture rounded-sm border border-aged/40 p-6 glow-purple relative">
-          {/* Red margin line like a real notebook */}
           <div className="absolute left-12 top-0 bottom-0 w-px bg-red-300/30" />
           <TextareaAutosize
             value={content}
@@ -155,24 +184,29 @@ export default function WritePage() {
         <div className="absolute bottom-3 right-4 font-pixel text-ink/30 text-xs">{wordCount}w</div>
       </motion.div>
 
-      {/* Save / saved state */}
+      {error && (
+        <p className="font-mono text-red-400 text-xs mb-4">{'>'} {error}</p>
+      )}
+
       <AnimatePresence mode="wait">
         {!saved ? (
           <motion.div className="flex gap-4 items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.button
               onClick={handleSave}
-              disabled={!content.trim()}
+              disabled={!content.trim() || saving}
               className={`font-pixel text-xs px-6 py-4 pixel-border transition-all duration-200 ${
-                content.trim() ? 'bg-sage text-ink hover:bg-cream cursor-pointer' : 'bg-dusty/20 text-dusty/40 cursor-not-allowed'
+                content.trim() && !saving
+                  ? 'bg-sage text-ink hover:bg-cream cursor-pointer'
+                  : 'bg-dusty/20 text-dusty/40 cursor-not-allowed'
               }`}
-              whileHover={content.trim() ? { scale: 1.04 } : {}}
-              whileTap={content.trim() ? { scale: 0.97 } : {}}
+              whileHover={content.trim() && !saving ? { scale: 1.04 } : {}}
+              whileTap={content.trim() && !saving ? { scale: 0.97 } : {}}
             >
-              save entry ✦
+              {saving ? 'saving...' : 'save entry ✦'}
             </motion.button>
             {content.trim() && (
               <span className="font-mono text-dusty/50 text-xs">
-                {selectedMood ? `feeling ${selectedMood.emoji}` : 'no mood selected'}
+                {user ? '☁ will sync' : '⚠ not signed in — saves locally only'}
               </span>
             )}
           </motion.div>
