@@ -116,10 +116,21 @@ export default function WritePage() {
           const embedding = await generateEmbedding(content.trim())
 
           // Step 3 — update the entry row with its embedding
-          await supabase
+/*           await supabase
+            .from('entries')
+            .update({ embedding })
+            .eq('id', entryId) */
+
+            const { error: embeddingError } = await supabase
             .from('entries')
             .update({ embedding })
             .eq('id', entryId)
+
+          if (embeddingError) {
+            console.error('embedding save error:', embeddingError)
+          } else {
+            console.log('embedding saved successfully')
+}
 
           // Step 4 — find past entries with similar meaning
           setBrainStep(2)

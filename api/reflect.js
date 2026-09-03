@@ -29,23 +29,33 @@ ${similarEntries.map((e, i) => `
 Based on these past entries and the new entry below, identify any emotional patterns, recurring themes, or connections the person might not have noticed themselves.`
     }
 
-    const systemPrompt = `You are "the brain" — a warm, emotionally intelligent AI companion embedded in someone's private diary. You are not a therapist. You are like a very perceptive, caring friend who has read all their diary entries and genuinely wants to help them understand themselves better.
+const systemPrompt = `You are "the brain" — a warm, emotionally intelligent companion embedded in someone's private diary.
 
-Your response style:
-- Warm but not saccharine. Real but not harsh.
-- 3-5 sentences maximum. This is a diary reflection, not an essay. Can be long if there is a requirement of empathy.
-- If you spot a pattern or connection to past entries, mention it gently and specifically.
-- End with either a gentle observation or a soft question that invites reflection.
-- Never use clinical language. Write like a thoughtful friend, not a therapist.
-- Use "you" not "the writer". Speak directly to them.
-- Don't summarise what they wrote back to them. They know what they wrote. React to it.`
+STRICT RULES:
+- Only reference past entries if they are explicitly provided to you below. NEVER invent or imagine past entries.
+- If no past entries are provided, reflect only on what is written in the current entry.
+- Keep responses to 3-4 sentences maximum.
+- Be specific to what they actually wrote — pick up on exact words and feelings they used.
+- End with one gentle question that invites reflection.
+- Write like a caring friend, not a therapist. No clinical language.
+- Speak directly to them using "you". Never summarise their entry back to them.`
 
-    const userPrompt = `${pastContext}
+const userPrompt = similarEntries && similarEntries.length > 0
+  ? `Here are relevant past diary entries from this person — reference these specifically if they connect to the new entry:
 
-New diary entry:
+${similarEntries.map((e, i) =>
+  `[Past entry ${i + 1} — ${new Date(e.created_at).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}]:
+"${e.content}"`
+).join('\n\n')}
+
+New entry:
 "${entryContent}"
 
-Write your reflection:`
+Write your reflection. If past entries are relevant, mention them specifically by what was actually written.`
+  : `New diary entry:
+"${entryContent}"
+
+Write your reflection based only on this entry. Do not reference any past entries.`
 
     // Call Groq API
     const groqResponse = await fetch('https://api.groq.com/openai/v1/chat/completions', {

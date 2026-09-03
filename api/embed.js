@@ -12,43 +12,40 @@ export default async function handler(req) {
 
   try {
     const { text } = await req.json()
+    const apiKey = process.env.HUGGINGFACE_API_KEY
 
-    // Call Hugging Face inference API
-    // We use all-MiniLM-L6-v2 — a small but excellent embedding model
-    // It converts text into 384 numbers representing its meaning
+
     const hfResponse = await fetch(
-      'https://api-inference.huggingface.co/pipeline/feature-extraction/sentence-transformers/all-MiniLM-L6-v2',
+      'https://router.huggingface.co/hf-inference/models/sentence-transformers/all-MiniLM-L6-v2/pipeline/feature-extraction',
       {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${process.env.HUGGINGFACE_API_KEY}`,
+          'Authorization': `Bearer ${apiKey}`,
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          inputs: text,
-          options: { wait_for_model: true },
-        }),
+        body: JSON.stringify({ inputs: text }),
       }
     )
 
+
+    const rawText = await hfResponse.text()
+  
+
     if (!hfResponse.ok) {
-      const err = await hfResponse.text()
-      throw new Error(`HuggingFace error: ${err}`)
+      throw new Error(`HuggingFace ${hfResponse.status}: ${rawText}`)
     }
 
-    const embedding = await hfResponse.json()
+    const data = JSON.parse(rawText)
+    const embedding = Array.isArray(data[0]) ? data[0] : data
+    console.log('Embedding length:', embedding.length)
 
-    // HF returns a nested array [[...384 numbers...]]
-    // We flatten it to a single array [...384 numbers...]
-    const vector = Array.isArray(embedding[0]) ? embedding[0] : embedding
-
-    return new Response(JSON.stringify({ embedding: vector }), {
+    return new Response(JSON.stringify({ embedding }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' },
     })
 
   } catch (error) {
-    console.error('embed error:', error)
+    console.error('embed error:', error.message)
     return new Response(JSON.stringify({ error: error.message }), {
       status: 500,
       headers: { 'Content-Type': 'application/json' },
