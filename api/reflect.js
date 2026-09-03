@@ -12,6 +12,7 @@ export default async function handler(req) {
   }
 
   try {
+
     const { entryContent, similarEntries } = await req.json()
 
     // Build the context from similar past entries
@@ -37,8 +38,7 @@ Your response style:
 - End with either a gentle observation or a soft question that invites reflection.
 - Never use clinical language. Write like a thoughtful friend, not a therapist.
 - Use "you" not "the writer". Speak directly to them.
-- Don't summarise what they wrote back to them. They know what they wrote. React to it.
-- Add a little bit of mystical whimsy to the writing style.`
+- Don't summarise what they wrote back to them. They know what they wrote. React to it.`
 
     const userPrompt = `${pastContext}
 
@@ -55,7 +55,7 @@ Write your reflection:`
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'llama-3.1-8b-instant',
+        model: 'openai/gpt-oss-20b',
         messages: [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: userPrompt },
