@@ -4,6 +4,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import TextareaAutosize from 'react-textarea-autosize'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
+import { generateEmbedding, generateReflection, findSimilarEntries } from '../lib/ai'
 
 const MOODS = [
   { emoji: '✨', label: 'magical' },
@@ -28,6 +29,15 @@ const PROMPTS = [
   'what would you tell yourself from this morning?',
 ]
 
+// Shows what the brain is currently doing — gives the user feedback
+// during the AI processing steps which can take a few seconds
+const BRAIN_STEPS = [
+  'reading your entry...',
+  'searching your memory...',
+  'finding patterns...',
+  'writing reflection...',
+]
+
 function getDateString() {
   return new Date().toLocaleDateString('en-US', {
     weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
@@ -41,6 +51,7 @@ export default function WritePage() {
   const [selectedMood, setSelectedMood] = useState(null)
   const [saved, setSaved] = useState(false)
   const [saving, setSaving] = useState(false)
+  const [brainStep, setBrainStep] = useState(0)
   const [error, setError] = useState('')
   const [wordCount, setWordCount] = useState(0)
   const [prompt, setPrompt] = useState('')
@@ -63,29 +74,85 @@ export default function WritePage() {
     setWordCount(content.trim() ? words.length : 0)
   }, [content])
 
+  // Cycle through brain status messages while AI is processing
+  useEffect(() => {
+    if (!saving) return
+    const interval = setInterval(() => {
+      setBrainStep(s => (s + 1) % BRAIN_STEPS.length)
+    }, 1800)
+    return () => clearInterval(interval)
+  }, [saving])
+
   const handleSave = async () => {
     if (!content.trim()) return
     setSaving(true)
     setError('')
 
     if (user) {
-      // User is logged in — save to Supabase
-      const { error } = await supabase
-        .from('entries')
-        .insert({
-          user_id: user.id,
-          content: content.trim(),
-          mood_emoji: selectedMood?.emoji || null,
-          mood_label: selectedMood?.label || null,
-        })
+      try {
+        // Step 1 — save the entry text first so we have an ID
+        setBrainStep(0)
+        const { data: entryData, error: entryError } = await supabase
+          .from('entries')
+          .insert({
+            user_id: user.id,
+            content: content.trim(),
+            mood_emoji: selectedMood?.emoji || null,
+            mood_label: selectedMood?.label || null,
+          })
+          .select()
+          .single()
 
-      if (error) {
-        setError('something went wrong saving. try again.')
-        setSaving(false)
-        return
+        if (entryError) throw entryError
+
+        const entryId = entryData.id
+
+        // Step 2 — generate embedding for this entry
+        // The embedding represents the *meaning* of the text as numbers
+        setBrainStep(1)
+        let similarEntries = []
+
+        try {
+          const embedding = await generateEmbedding(content.trim())
+
+          // Step 3 — update the entry row with its embedding
+          await supabase
+            .from('entries')
+            .update({ embedding })
+            .eq('id', entryId)
+
+          // Step 4 — find past entries with similar meaning
+          setBrainStep(2)
+          similarEntries = await findSimilarEntries(supabase, embedding, user.id, entryId)
+
+        } catch (embedError) {
+          // Embedding failed — not critical, continue without memory
+          // The reflection will still work, just without past context
+          console.warn('embedding failed, continuing without memory:', embedError)
+        }
+
+        // Step 5 — generate AI reflection
+        // Passes the entry + any similar past entries for pattern finding
+        setBrainStep(3)
+        const reflection = await generateReflection(content.trim(), similarEntries)
+
+        // Step 6 — save the reflection to the database
+        await supabase
+          .from('reflections')
+          .insert({
+            entry_id: entryId,
+            user_id: user.id,
+            ai_response: reflection,
+            linked_entry_ids: similarEntries.map(e => e.id),
+          })
+
+      } catch (err) {
+        console.error('save error:', err)
+        setError('something went wrong. your entry was saved but the brain had trouble reflecting.')
       }
+
     } else {
-      // Not logged in — fall back to localStorage
+      // Not logged in — localStorage fallback (no AI, no memory)
       const entry = {
         id: Date.now().toString(),
         content,
@@ -98,7 +165,7 @@ export default function WritePage() {
 
     setSaving(false)
     setSaved(true)
-    setTimeout(() => navigate('/timeline'), 1800)
+    setTimeout(() => navigate('/timeline'), 2000)
   }
 
   return (
@@ -109,11 +176,7 @@ export default function WritePage() {
           {'<'} back
         </button>
         <div className="flex items-center gap-3">
-          {user && (
-            <span className="font-mono text-sage text-xs opacity-70">
-              ● syncing to cloud
-            </span>
-          )}
+          {user && <span className="font-mono text-sage text-xs opacity-70">● syncing to cloud</span>}
           <span className="font-pixel text-dusty text-xs opacity-60">{getDateString()}</span>
         </div>
       </div>
@@ -189,24 +252,43 @@ export default function WritePage() {
       )}
 
       <AnimatePresence mode="wait">
-        {!saved ? (
+        {saving ? (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="flex items-center gap-3"
+          >
+            {/* Animated brain indicator */}
+            <motion.span
+              className="text-xl"
+              animate={{ scale: [1, 1.2, 1] }}
+              transition={{ duration: 0.8, repeat: Infinity }}
+            >
+              🧠
+            </motion.span>
+            <span className="font-pixel text-dusty text-xs animate-pulse">
+              {BRAIN_STEPS[brainStep]}
+            </span>
+          </motion.div>
+        ) : !saved ? (
           <motion.div className="flex gap-4 items-center" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>
             <motion.button
               onClick={handleSave}
-              disabled={!content.trim() || saving}
+              disabled={!content.trim()}
               className={`font-pixel text-xs px-6 py-4 pixel-border transition-all duration-200 ${
-                content.trim() && !saving
+                content.trim()
                   ? 'bg-sage text-ink hover:bg-cream cursor-pointer'
                   : 'bg-dusty/20 text-dusty/40 cursor-not-allowed'
               }`}
-              whileHover={content.trim() && !saving ? { scale: 1.04 } : {}}
-              whileTap={content.trim() && !saving ? { scale: 0.97 } : {}}
+              whileHover={content.trim() ? { scale: 1.04 } : {}}
+              whileTap={content.trim() ? { scale: 0.97 } : {}}
             >
-              {saving ? 'saving...' : 'save entry ✦'}
+              save entry ✦
             </motion.button>
             {content.trim() && (
               <span className="font-mono text-dusty/50 text-xs">
-                {user ? '☁ will sync' : '⚠ not signed in — saves locally only'}
+                {user ? '☁ will sync + get reflection' : '⚠ not signed in — saves locally only'}
               </span>
             )}
           </motion.div>

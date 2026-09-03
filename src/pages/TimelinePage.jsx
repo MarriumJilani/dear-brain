@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { motion } from 'framer-motion'
+import { motion, AnimatePresence } from 'framer-motion'
 import { supabase } from '../lib/supabase'
 import { useAuth } from '../context/AuthContext'
 
@@ -18,6 +18,7 @@ export default function TimelinePage() {
   const navigate = useNavigate()
   const { user, signOut } = useAuth()
   const [entries, setEntries] = useState([])
+  const [reflections, setReflections] = useState({})
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
 
@@ -29,18 +30,33 @@ export default function TimelinePage() {
     setLoading(true)
 
     if (user) {
-      // Logged in — fetch from Supabase
-      // .order('created_at', { ascending: false }) means newest first
-      const { data, error } = await supabase
-        .from('entries')
-        .select('*')
-        .order('created_at', { ascending: false })
+      // Fetch entries and reflections in parallel
+      // Promise.all runs both queries at the same time instead of one after the other
+      // This cuts the loading time roughly in half
+      const [entriesResult, reflectionsResult] = await Promise.all([
+        supabase
+          .from('entries')
+          .select('*')
+          .order('created_at', { ascending: false }),
+        supabase
+          .from('reflections')
+          .select('*')
+          .order('created_at', { ascending: false }),
+      ])
 
-      if (!error && data) {
-        setEntries(data)
+      if (entriesResult.data) setEntries(entriesResult.data)
+
+      // Convert reflections array into a map keyed by entry_id
+      // So you can do reflections[entryId] instead of searching the array every time
+      if (reflectionsResult.data) {
+        const reflMap = {}
+        reflectionsResult.data.forEach(r => {
+          reflMap[r.entry_id] = r
+        })
+        setReflections(reflMap)
       }
+
     } else {
-      // Not logged in — read from localStorage
       const stored = JSON.parse(localStorage.getItem('dear-brain-entries') || '[]')
       setEntries(stored)
     }
@@ -77,11 +93,9 @@ export default function TimelinePage() {
       </div>
 
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="mb-8">
-        <h1 className="font-pixel text-center text-cream text-xl glow-pink mb-4">Your Timeline</h1>
-        {user && (
-          <p className="font-mono text-center text-sage text-xs mt-1 opacity-70 mb-3">● {user.email}</p>
-        )}
-        <p className="font-mono text-right text-dusty text-xs mt-2">
+        <h1 className="font-pixel text-cream text-base glow-pink mb-1">your timeline</h1>
+        {user && <p className="font-mono text-sage text-xs mt-1 opacity-70">● {user.email}</p>}
+        <p className="font-mono text-dusty text-xs mt-2">
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'} in your diary
         </p>
         <div className="h-px bg-gradient-to-r from-blush/60 to-transparent mt-3" />
@@ -105,63 +119,96 @@ export default function TimelinePage() {
         <div className="relative">
           <div className="absolute left-3 top-0 bottom-0 w-px bg-dusty/20" />
           <div className="space-y-6 pl-10">
-            {entries.map((entry, i) => (
-              <motion.div
-                key={entry.id}
-                initial={{ opacity: 0, x: -10 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: i * 0.07 }}
-                className="relative"
-              >
-                <div className="absolute -left-7 top-3 w-2.5 h-2.5 rounded-full bg-dusty border-2 border-ink" />
-                <div
-                  className={`border transition-all duration-200 cursor-pointer ${
-                    selected === entry.id
-                      ? 'border-blush/60 bg-blush/5'
-                      : 'border-dusty/20 hover:border-dusty/50 bg-cream/[0.02]'
-                  }`}
-                  onClick={() => setSelected(selected === entry.id ? null : entry.id)}
+            {entries.map((entry, i) => {
+              const reflection = reflections[entry.id]
+              return (
+                <motion.div
+                  key={entry.id}
+                  initial={{ opacity: 0, x: -10 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  transition={{ delay: i * 0.07 }}
+                  className="relative"
                 >
-                  <div className="p-4">
-                    <div className="flex items-start justify-between mb-2">
-                      <span className="font-pixel text-dusty text-xs">
-                        {formatDate(entry.created_at || entry.createdAt)}
-                      </span>
-                      {(entry.mood_emoji || entry.mood?.emoji) && (
-                        <span className="text-lg">{entry.mood_emoji || entry.mood?.emoji}</span>
+                  <div className="absolute -left-7 top-3 w-2.5 h-2.5 rounded-full bg-dusty border-2 border-ink" />
+
+                  <div
+                    className={`border transition-all duration-200 cursor-pointer ${
+                      selected === entry.id
+                        ? 'border-blush/60 bg-blush/5'
+                        : 'border-dusty/20 hover:border-dusty/50 bg-cream/[0.02]'
+                    }`}
+                    onClick={() => setSelected(selected === entry.id ? null : entry.id)}
+                  >
+                    <div className="p-4">
+                      <div className="flex items-start justify-between mb-2">
+                        <span className="font-pixel text-dusty text-xs">
+                          {formatDate(entry.created_at || entry.createdAt)}
+                        </span>
+                        <div className="flex items-center gap-2">
+                          {/* Brain dot — green if reflection exists, grey if not */}
+                          <span
+                            className={`text-xs ${reflection ? 'text-sage' : 'text-dusty/30'}`}
+                            title={reflection ? 'brain reflection available' : 'no reflection yet'}
+                          >
+                            🧠
+                          </span>
+                          {(entry.mood_emoji || entry.mood?.emoji) && (
+                            <span className="text-lg">{entry.mood_emoji || entry.mood?.emoji}</span>
+                          )}
+                        </div>
+                      </div>
+
+                      {selected === entry.id ? (
+                        <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="paper-texture p-4 mt-2">
+                          <p className="font-mono text-ink text-sm leading-relaxed whitespace-pre-wrap"
+                             style={{ fontFamily: "'Lora', serif" }}>
+                            {entry.content}
+                          </p>
+                        </motion.div>
+                      ) : (
+                        <p className="font-mono text-cream/50 text-xs leading-relaxed">
+                          {getPreview(entry.content)}
+                        </p>
                       )}
                     </div>
 
-                    {selected === entry.id ? (
-                      <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="paper-texture p-4 mt-2">
-                        <p className="font-mono text-ink text-sm leading-relaxed whitespace-pre-wrap"
-                           style={{ fontFamily: "'Lora', serif" }}>
-                          {entry.content}
-                        </p>
-                      </motion.div>
-                    ) : (
-                      <p className="font-mono text-cream/50 text-xs leading-relaxed">
-                        {getPreview(entry.content)}
-                      </p>
-                    )}
-                  </div>
+                    {/* Brain reflection section — only shows when entry is expanded */}
+                    <AnimatePresence>
+                      {selected === entry.id && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: 'auto' }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="border-t border-dusty/20 overflow-hidden"
+                        >
+                          <div className="p-4 bg-dusty/5">
+                            <p className="font-pixel text-dusty text-xs mb-3">🧠 brain says:</p>
 
-                  {selected === entry.id && (
-                    <motion.div
-                      initial={{ opacity: 0 }}
-                      animate={{ opacity: 1 }}
-                      transition={{ delay: 0.2 }}
-                      className="border-t border-dusty/20 p-4 bg-dusty/5"
-                    >
-                      <p className="font-pixel text-dusty text-xs mb-2">🧠 brain says:</p>
-                      <p className="font-mono text-dusty/60 text-xs leading-relaxed italic">
-                        coming in week 3 — the brain will connect your entries and reflect back patterns you might have missed.
-                      </p>
-                    </motion.div>
-                  )}
-                </div>
-              </motion.div>
-            ))}
+                            {reflection ? (
+                              <>
+                                <p className="font-mono text-cream/80 text-xs leading-relaxed">
+                                  {reflection.ai_response}
+                                </p>
+                                {/* Show which past entries the brain connected */}
+                                {reflection.linked_entry_ids?.length > 0 && (
+                                  <p className="font-pixel text-dusty/40 text-xs mt-3">
+                                    ↗ connected to {reflection.linked_entry_ids.length} past {reflection.linked_entry_ids.length === 1 ? 'entry' : 'entries'}
+                                  </p>
+                                )}
+                              </>
+                            ) : (
+                              <p className="font-mono text-dusty/40 text-xs leading-relaxed italic">
+                                no reflection for this entry yet.
+                              </p>
+                            )}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </motion.div>
+              )
+            })}
           </div>
         </div>
       )}
