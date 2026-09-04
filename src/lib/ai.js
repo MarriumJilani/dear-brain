@@ -37,7 +37,7 @@ export async function findSimilarEntries(supabase, embedding, userId, excludeEnt
     query_embedding: embedding,
     match_user_id: userId,
     match_count: 3,
-    match_threshold: 0.5,
+    match_threshold: 0.15,
   })
 
   if (error) {

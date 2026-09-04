@@ -37,7 +37,7 @@ export default async function handler(req) {
 
     const data = JSON.parse(rawText)
     const embedding = Array.isArray(data[0]) ? data[0] : data
-    console.log('Embedding length:', embedding.length)
+  
 
     return new Response(JSON.stringify({ embedding }), {
       status: 200,

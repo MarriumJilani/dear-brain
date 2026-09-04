@@ -255,7 +255,10 @@ export default function WritePage() {
             autoFocus
           />
         </div>
-        <div className="absolute bottom-3 right-4 font-pixel text-ink/30 text-xs">{wordCount}w</div>
+       
+        <div className="absolute bottom-3 right-4 font-pixel text-ink/30 text-xs">
+          {wordCount}w {wordCount > 0 && wordCount < 20 && '· write more for better memory'}
+        </div>
       </motion.div>
 
       {error && (
