@@ -21,6 +21,7 @@ export default function TimelinePage() {
   const [reflections, setReflections] = useState({})
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
+  const [deleting, setDeleting] = useState(null) // holds the entry id being deleted
 
   useEffect(() => {
     fetchEntries()
@@ -67,6 +68,36 @@ export default function TimelinePage() {
   const handleSignOut = async () => {
     await signOut()
     navigate('/')
+  }
+    const handleDelete = async (entryId) => {
+    // First click sets deleting state — shows confirm button
+    // Second click actually deletes
+    if (deleting !== entryId) {
+      setDeleting(entryId)
+      return
+    }
+
+    // Confirmed — delete from Supabase
+    // Reflection deletes automatically via cascade
+    const { error } = await supabase
+      .from('entries')
+      .delete()
+      .eq('id', entryId)
+
+    if (error) {
+      console.error('delete error:', error)
+      return
+    }
+
+    // Remove from local state so UI updates instantly without refetch
+    setEntries(prev => prev.filter(e => e.id !== entryId))
+    setReflections(prev => {
+      const updated = { ...prev }
+      delete updated[entryId]
+      return updated
+    })
+    setSelected(null)
+    setDeleting(null)
   }
 
   return (
@@ -137,15 +168,17 @@ export default function TimelinePage() {
                         ? 'border-blush/60 bg-blush/5'
                         : 'border-dusty/20 hover:border-dusty/50 bg-cream/[0.02]'
                     }`}
-                    onClick={() => setSelected(selected === entry.id ? null : entry.id)}
+                    onClick={() => {
+                              setDeleting(null) // cancel any pending delete confirm
+                              setSelected(selected === entry.id ? null : entry.id)
+                            }}
                   >
                     <div className="p-4">
                       <div className="flex items-start justify-between mb-2">
                         <span className="font-pixel text-dusty text-xs">
                           {formatDate(entry.created_at || entry.createdAt)}
                         </span>
-                        <div className="flex items-center gap-2">
-                          {/* Brain dot — green if reflection exists, grey if not */}
+                        <div className="flex items-center gap-3">
                           <span
                             className={`text-xs ${reflection ? 'text-sage' : 'text-dusty/30'}`}
                             title={reflection ? 'brain reflection available' : 'no reflection yet'}
@@ -154,6 +187,25 @@ export default function TimelinePage() {
                           </span>
                           {(entry.mood_emoji || entry.mood?.emoji) && (
                             <span className="text-lg">{entry.mood_emoji || entry.mood?.emoji}</span>
+                          )}
+
+                          {/* Delete button — only shows when entry is expanded */}
+                          {selected === entry.id && user && (
+                            <motion.button
+                              initial={{ opacity: 0 }}
+                              animate={{ opacity: 1 }}
+                              onClick={e => {
+                                e.stopPropagation() // prevent card toggle when clicking delete
+                                handleDelete(entry.id)
+                              }}
+                              className={`font-pixel text-xs transition-colors px-2 py-1 ${
+                                deleting === entry.id
+                                  ? 'text-red-400 border border-red-400/50 bg-red-400/10'
+                                  : 'text-dusty/30 hover:text-red-400'
+                              }`}
+                            >
+                              {deleting === entry.id ? 'confirm delete?' : 'delete'}
+                            </motion.button>
                           )}
                         </div>
                       </div>

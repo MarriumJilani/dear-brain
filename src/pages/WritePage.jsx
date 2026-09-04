@@ -53,6 +53,8 @@ export default function WritePage() {
   const [saving, setSaving] = useState(false)
   const [brainStep, setBrainStep] = useState(0)
   const [error, setError] = useState('')
+  const [guestReflection, setGuestReflection] = useState('')
+  const [showGuestReflection, setShowGuestReflection] = useState(false)
   const [wordCount, setWordCount] = useState(0)
   const [prompt, setPrompt] = useState('')
   const [showPrompt, setShowPrompt] = useState(false)
@@ -75,13 +77,13 @@ export default function WritePage() {
   }, [content])
 
   // Cycle through brain status messages while AI is processing
-  useEffect(() => {
-    if (!saving) return
-    const interval = setInterval(() => {
-      setBrainStep(s => (s + 1) % BRAIN_STEPS.length)
-    }, 1800)
-    return () => clearInterval(interval)
-  }, [saving])
+    useEffect(() => {
+      if (!saving || !user) return
+      const interval = setInterval(() => {
+        setBrainStep(s => (s + 1) % BRAIN_STEPS.length)
+      }, 1800)
+      return () => clearInterval(interval)
+    }, [saving, user])
 
   const handleSave = async () => {
     if (!content.trim()) return
@@ -116,10 +118,6 @@ export default function WritePage() {
           const embedding = await generateEmbedding(content.trim())
 
           // Step 3 — update the entry row with its embedding
-/*           await supabase
-            .from('entries')
-            .update({ embedding })
-            .eq('id', entryId) */
 
             const { error: embeddingError } = await supabase
             .from('entries')
@@ -162,17 +160,28 @@ export default function WritePage() {
         setError('something went wrong. your entry was saved but the brain had trouble reflecting.')
       }
 
-    } else {
-      // Not logged in — localStorage fallback (no AI, no memory)
-      const entry = {
-        id: Date.now().toString(),
-        content,
-        mood: selectedMood,
-        createdAt: new Date().toISOString(),
+      }  else {
+    // Guest user — one-time reflection, no saving
+    setSaving(false)
+    try {
+      const response = await fetch('/api/reflect', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          entryContent: content.trim(),
+          similarEntries: [],
+        }),
+      })
+      if (response.ok) {
+        const { reflection } = await response.json()
+        setGuestReflection(reflection)
       }
-      const existing = JSON.parse(localStorage.getItem('dear-brain-entries') || '[]')
-      localStorage.setItem('dear-brain-entries', JSON.stringify([entry, ...existing]))
+    } catch (err) {
+      console.error('guest reflection error:', err)
     }
+    setShowGuestReflection(true)
+    return
+  }
 
     setSaving(false)
     setSaved(true)
@@ -309,6 +318,63 @@ export default function WritePage() {
         ) : (
           <motion.div initial={{ opacity: 0, scale: 0.9 }} animate={{ opacity: 1, scale: 1 }} className="font-pixel text-sage text-xs">
             ✓ entry saved. the brain is listening...
+          </motion.div>
+        )}
+      </AnimatePresence>
+            {/* Guest reflection */}
+      <AnimatePresence>
+        {showGuestReflection && (
+          <motion.div
+            initial={{ opacity: 0, y: 16 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+            className="mt-8 space-y-4"
+          >
+            <div className="border border-dusty/30 bg-dusty/5 p-5">
+              <p className="font-pixel text-dusty text-xs mb-3">🧠 brain says:</p>
+              {guestReflection ? (
+                <p className="font-mono text-cream/80 text-xs leading-relaxed">
+                  {guestReflection}
+                </p>
+              ) : (
+                <p className="font-mono text-dusty/40 text-xs italic">thinking...</p>
+              )}
+            </div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.4 }}
+              className="border border-blush/30 bg-blush/5 p-5"
+            >
+              <p className="font-pixel text-blush text-xs mb-2">
+                ✦ your brain is just getting started
+              </p>
+              <p className="font-mono text-cream/60 text-xs leading-relaxed mb-4">
+                this was a one-time reflection. create a free account and the brain remembers everything — connecting your entries across weeks and months to find the patterns you missed.
+              </p>
+              <div className="flex gap-3 flex-wrap">
+                <motion.button
+                  onClick={() => navigate('/login')}
+                  className="font-pixel text-xs bg-blush text-ink px-4 py-3 pixel-border hover:bg-cream transition-colors"
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
+                >
+                  create free account ✦
+                </motion.button>
+                <motion.button
+                  onClick={() => {
+                    setShowGuestReflection(false)
+                    setContent('')
+                    setSelectedMood(null)
+                    setSaved(false)
+                  }}
+                  className="font-pixel text-xs text-dusty/50 hover:text-dusty transition-colors"
+                >
+                  write another
+                </motion.button>
+              </div>
+            </motion.div>
           </motion.div>
         )}
       </AnimatePresence>
