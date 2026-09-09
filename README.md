@@ -4,11 +4,13 @@
 
 ### *we write diaries. but what if your diary could write back?*
 
-Most diaries just store what happened. dear brain actually *thinks* about it — connecting your feelings across weeks and months, finding the patterns you were too close to see.
+> sole developer — concept, design, frontend, backend, AI pipeline, deployment
+
+*a solo full-stack AI project — designed, built, and deployed in 5 weeks*
 
 **[→ try it live](https://dear-brain.vercel.app)**
 
-![](https://img.shields.io/badge/status-live-a8c5a0?style=flat-square) ![](https://img.shields.io/badge/stack-React%20%2B%20Supabase%20%2B%20Groq-9b8ea8?style=flat-square) ![](https://img.shields.io/badge/AI-RAG%20pipeline-e8c4c4?style=flat-square)
+![](https://img.shields.io/badge/status-live-a8c5a0?style=flat-square) ![](https://img.shields.io/badge/stack-React%20%2B%20Supabase%20%2B%20Groq-9b8ea8?style=flat-square) ![](https://img.shields.io/badge/AI-RAG%20pipeline-e8c4c4?style=flat-square) ![](https://img.shields.io/badge/cost-$0-d4a96a?style=flat-square)
 
 </div>
 
@@ -16,9 +18,11 @@ Most diaries just store what happened. dear brain actually *thinks* about it —
 
 ## the idea
 
-You write about a fight with Sara. Six weeks later you write that Sara gave you cold vibes at the mall.
+Most diaries just store what happened. dear brain actually *thinks* about it — reading everything you've ever written, finding the emotional threads across months, and reflecting back the patterns you were too close to see.
 
-Your diary remembers the fight. The brain connects them.
+Built solo in 5 weeks using a production RAG architecture. Runs entirely on free APIs.
+
+You write about a fight with Sara. Six weeks later you write that Sara gave you cold vibes at the mall. Your diary remembers the fight. The brain connects them.
 
 > *"It sounds like the cold vibes you felt at the mall echo that 'huge fight with Sara' you wrote about, where 'she said things that really hurt me and I don't know if I can forgive her.' The contrast between her acting like nothing happened and the chill in her tone must feel even more jarring."*
 
@@ -26,15 +30,21 @@ That's not a generic AI response. That's your history, reflected back at you.
 
 ---
 
-## what it does
+## screenshots
 
-**Write** — a lined paper diary with mood tagging, writing prompts, and a typewriter aesthetic that makes journalling feel like entering a private world.
+<!-- Landing page -->
+![dear brain landing page](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/landing.png)
 
-**Remember** — every entry is converted into a semantic vector and stored. The brain doesn't just keyword-search your past. It understands *meaning* — so "I feel invisible at home" connects to "nobody noticed I was upset" even though they share no words.
+<!-- Write page with paper texture -->
+![writing a diary entry](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/write.png)
 
-**Reflect** — after every save, the brain searches your entire diary history for emotionally related entries, then writes a response that's specific to *you* — your words, your people, your patterns.
+<!-- Brain reflection with cross-entry connection -->
+![brain reflection connecting past entries](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/reflection.png)
 
-**Connect** — entries that link to past ones show *"↗ connected to N past entries"* so you can see the thread the brain pulled.
+<!-- Search and mood filter -->
+![mood filter](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/filter.png)
+
+![search](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/search.png)
 
 ---
 
@@ -45,52 +55,68 @@ This is a RAG (Retrieval-Augmented Generation) pipeline — the same architectur
 ```
 you write an entry
         ↓
-semantic embedding generated (384-dimension vector representing meaning)
+HuggingFace converts it to a 384-dimension semantic vector
         ↓
 pgvector searches your diary history for similar vectors
         ↓
 top 3 most semantically related past entries retrieved
         ↓
-LLM receives: today's entry + your relevant history + system prompt
+Groq LLM receives: today's entry + your relevant history + system prompt
         ↓
 reflection written — grounded in your actual past, not invented
         ↓
 response + linked entry IDs saved to database
 ```
 
-Two entries connect based on emotional similarity, not word overlap. The brain finds what you forgot you wrote.
+Two entries connect based on emotional similarity, not word overlap. "I feel invisible at home" connects to "nobody noticed I was upset" even though they share no words. The brain finds what you forgot you wrote.
+
+---
+
+## features
+
+- **AI reflection** — after every entry, the brain responds like a thoughtful friend who has read everything you've ever written
+- **cross-entry memory** — semantic vectors + pgvector finds emotionally related past entries before every reflection
+- **real-time search** — filter your entire diary history by keyword instantly
+- **mood filter** — filter entries by how you were feeling that day
+- **delete entries** — with a two-click confirmation gate so nothing goes by accident
+- **guest preview** — visitors get a one-time brain reflection before signup to feel the magic before committing
+- **auth + privacy** — every diary is private by design via Supabase Row Level Security
+- **retro UI** — scanline overlay, pixel fonts, blinking cursors, paper texture, star field
 
 ---
 
 ## tech stack
 
-| | |
-|---|---|
-| **Frontend** | React 18, Vite, TailwindCSS, Framer Motion |
-| **Database** | Supabase (PostgreSQL + Auth + Row Level Security) |
-| **Vector search** | pgvector — cosine similarity on 384-dim embeddings |
-| **Embeddings** | HuggingFace `all-MiniLM-L6-v2` |
-| **LLM** | Groq `openai/gpt-oss-20b` |
-| **API layer** | Vercel Edge Functions — API keys never reach the browser |
-| **Deployment** | Vercel — auto-deploys on every GitHub push |
+| layer | technology | why |
+|---|---|---|
+| **Frontend** | React 18 + Vite | component architecture, fast dev experience |
+| **Styling** | TailwindCSS + Framer Motion | utility-first CSS, fluid animations |
+| **Database** | Supabase (PostgreSQL) | managed postgres, auth, RLS, free tier |
+| **Vector search** | pgvector | cosine similarity on 384-dim embeddings |
+| **Embeddings** | HuggingFace `all-MiniLM-L6-v2` | semantic vectors, free inference API |
+| **LLM** | Groq `openai/gpt-oss-20b` | fast inference, generous free tier |
+| **API layer** | Vercel Edge Functions | serverless, API keys never reach the browser |
+| **Deployment** | Vercel + GitHub Actions | auto-deploys on every push |
 
-Built entirely on free tiers. No cloud bill.
+**Total running cost: $0.** Built entirely on free tiers.
 
 ---
 
 ## security
 
-Every user's diary is private by design — not just by convention. Supabase Row Level Security enforces at the database level that you can only ever read, write, or update your own entries. Even a direct database query with the public API key returns nothing across users. The AI API keys live only in Vercel's server environment, never in client-side code.
+Every user's diary is private by design — not just by convention. Supabase Row Level Security enforces at the database level that you can only read, write, or update your own entries. Even with the public API key, a direct database query returns nothing across users. AI API keys live only in Vercel's server environment and never reach client-side code.
 
 ---
 
 ## what this project demonstrates
 
-- **RAG architecture** — embeddings, vector similarity search, and LLM composition working together
-- **Full-stack ownership** — frontend, auth, database schema, serverless API, and deployment
-- **AI system design** — prompt engineering, context injection, graceful degradation when APIs fail
-- **Database thinking** — pgvector indexing, RLS policies, relational schema design
-- **Production habits** — environment separation, CI/CD, security-first API design
+- **RAG architecture** — embeddings, vector similarity search, and LLM composition working together end to end
+- **Full-stack ownership** — frontend, auth, database schema, serverless API, and deployment owned by one person
+- **AI system design** — prompt engineering, context injection, graceful degradation when external APIs fail
+- **Database thinking** — pgvector indexing, RLS policies, foreign keys, cascade deletes
+- **Production habits** — environment separation, CI/CD pipeline, security-first API design
+- **UX engineering** — confirmation gates for destructive actions, real-time filtering, guest-to-user conversion flows
+- **Debugging complex systems** — tracing failures across React → Vercel Edge → HuggingFace → Supabase → pgvector
 
 ---
 
@@ -98,6 +124,6 @@ Every user's diary is private by design — not just by convention. Supabase Row
 
 **[→ open dear brain](https://dear-brain.vercel.app)**
 
-*built by [Marrium Jilani](https://github.com/MarriumJilani)*
+*built by [Marrium Jilani](https://github.com/MarriumJilani) · [LinkedIn](https://www.linkedin.com/in/marrium-jilani-a78101217/)*
 
 </div>
