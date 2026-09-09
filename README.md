@@ -1,6 +1,6 @@
 <div align="center">
 
-# 📓 dear brain
+# 📓 Dear Brain
 
 ### *we write diaries. but what if your diary could write back?*
 
@@ -16,7 +16,7 @@
 
 ---
 
-## the idea
+## The Idea
 
 Most diaries just store what happened. dear brain actually *thinks* about it — reading everything you've ever written, finding the emotional threads across months, and reflecting back the patterns you were too close to see.
 
@@ -30,13 +30,14 @@ That's not a generic AI response. That's your history, reflected back at you.
 
 ---
 
-## screenshots
+## Look and feel
 
 <!-- Landing page -->
 ![dear brain landing page](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/landing.png)
 
 <!-- Write page with paper texture -->
 ![writing a diary entry](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/write.png)
+
 
 <!-- Brain reflection with cross-entry connection -->
 ![brain reflection connecting past entries](https://raw.githubusercontent.com/MarriumJilani/dear-brain/main/docs/assets/reflection.png)
@@ -48,7 +49,7 @@ That's not a generic AI response. That's your history, reflected back at you.
 
 ---
 
-## how the AI memory works
+## How the AI memory works
 
 This is a RAG (Retrieval-Augmented Generation) pipeline — the same architecture used in production AI products.
 
@@ -72,7 +73,7 @@ Two entries connect based on emotional similarity, not word overlap. "I feel inv
 
 ---
 
-## features
+## Features
 
 - **AI reflection** — after every entry, the brain responds like a thoughtful friend who has read everything you've ever written
 - **cross-entry memory** — semantic vectors + pgvector finds emotionally related past entries before every reflection
@@ -85,7 +86,7 @@ Two entries connect based on emotional similarity, not word overlap. "I feel inv
 
 ---
 
-## tech stack
+## Tech Stack
 
 | layer | technology | why |
 |---|---|---|
@@ -102,13 +103,13 @@ Two entries connect based on emotional similarity, not word overlap. "I feel inv
 
 ---
 
-## security
+## Security
 
 Every user's diary is private by design — not just by convention. Supabase Row Level Security enforces at the database level that you can only read, write, or update your own entries. Even with the public API key, a direct database query returns nothing across users. AI API keys live only in Vercel's server environment and never reach client-side code.
 
 ---
 
-## what this project demonstrates
+## What this project demonstrates
 
 - **RAG architecture** — embeddings, vector similarity search, and LLM composition working together end to end
 - **Full-stack ownership** — frontend, auth, database schema, serverless API, and deployment owned by one person
