@@ -22,6 +22,30 @@ export default function TimelinePage() {
   const [selected, setSelected] = useState(null)
   const [loading, setLoading] = useState(true)
   const [deleting, setDeleting] = useState(null) // holds the entry id being deleted
+  const [search, setSearch] = useState('')
+  const [activeMood, setActiveMood] = useState(null) // null = show all
+
+
+  // Compute filtered entries whenever search or mood filter changes
+  // This runs on every render — no useEffect needed, it's just a derived value
+  const filteredEntries = entries.filter(entry => {
+    const matchesSearch = search.trim() === '' || 
+      entry.content.toLowerCase().includes(search.toLowerCase().trim())
+    
+    const matchesMood = activeMood === null || 
+      entry.mood_emoji === activeMood ||
+      entry.mood?.emoji === activeMood
+
+    return matchesSearch && matchesMood
+  })
+
+  // Get all unique moods that actually exist in the user's entries
+  // So we only show mood filters that have entries
+  const availableMoods = [...new Set(
+    entries
+      .map(e => e.mood_emoji || e.mood?.emoji)
+      .filter(Boolean)
+  )]
 
   useEffect(() => {
     fetchEntries()
@@ -130,27 +154,123 @@ export default function TimelinePage() {
           {entries.length} {entries.length === 1 ? 'entry' : 'entries'} in your diary
         </p>
         <div className="h-px bg-gradient-to-r from-blush/60 to-transparent mt-3" />
+        {/* Search and mood filter — only show when there are entries */}
+          {entries.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              className="mt-6 space-y-3"
+            >
+              {/* Search bar */}
+              <div className="relative">
+                <span className="absolute left-3 top-1/2 -translate-y-1/2 font-pixel text-dusty/40 text-xs">
+                  {'>'}
+                </span>
+                <input
+                  type="text"
+                  value={search}
+                  onChange={e => setSearch(e.target.value)}
+                  placeholder="search your diary..."
+                  className="w-full bg-cream/[0.03] border border-dusty/20 text-cream font-mono text-xs px-8 py-3 outline-none focus:border-dusty/50 transition-colors placeholder:text-dusty/30"
+                />
+                {/* Clear button — only shows when there's text */}
+                {search && (
+                  <button
+                    onClick={() => setSearch('')}
+                    className="absolute right-3 top-1/2 -translate-y-1/2 font-mono text-dusty/40 hover:text-dusty transition-colors text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Mood filter pills */}
+              {availableMoods.length > 0 && (
+                <div className="flex flex-wrap gap-2 items-center">
+                  <span className="font-pixel text-dusty/40 text-xs">filter:</span>
+                  
+                  {/* "All" pill */}
+                  <button
+                    onClick={() => setActiveMood(null)}
+                    className={`font-mono text-xs px-3 py-1 border transition-colors ${
+                      activeMood === null
+                        ? 'border-dusty bg-dusty/20 text-cream'
+                        : 'border-dusty/20 text-dusty/50 hover:border-dusty/50'
+                    }`}
+                  >
+                    all
+                  </button>
+
+                  {/* One pill per unique mood in the diary */}
+                  {availableMoods.map(emoji => (
+                    <button
+                      key={emoji}
+                      onClick={() => setActiveMood(activeMood === emoji ? null : emoji)}
+                      className={`text-sm px-3 py-1 border transition-all ${
+                        activeMood === emoji
+                          ? 'border-blush bg-blush/20 scale-110'
+                          : 'border-dusty/20 hover:border-dusty/40 opacity-60 hover:opacity-100'
+                      }`}
+                    >
+                      {emoji}
+                    </button>
+                  ))}
+                </div>
+              )}
+
+              {/* Results count — only shows when filtering */}
+              {(search || activeMood) && (
+                <motion.p
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  className="font-mono text-dusty/50 text-xs"
+                >
+                  {filteredEntries.length} {filteredEntries.length === 1 ? 'entry' : 'entries'} found
+                  {search && ` for "${search}"`}
+                  {activeMood && ` feeling ${activeMood}`}
+                </motion.p>
+              )}
+            </motion.div>
+          )}
       </motion.div>
 
       {loading ? (
         <div className="text-center py-24">
           <p className="font-pixel text-dusty text-xs animate-pulse">loading your diary...</p>
         </div>
-      ) : entries.length === 0 ? (
+      ) : filteredEntries.length === 0 ? (
         <motion.div className="text-center py-24" initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.3 }}>
           <div className="text-5xl mb-4">📭</div>
           <p className="font-pixel text-dusty text-xs leading-loose">
-            no entries yet.<br />
-            <span className="text-blush cursor-pointer hover:text-cream" onClick={() => navigate('/write')}>
-              write your first one.
-            </span>
+            {search || activeMood ? (
+              <>
+                nothing found.<br />
+                <span
+                  className="text-blush cursor-pointer hover:text-cream"
+                  onClick={() => { setSearch(''); setActiveMood(null) }}
+                >
+                  clear filters
+                </span>
+              </>
+            ) : (
+              <>
+                no entries yet.<br />
+                <span
+                  className="text-blush cursor-pointer hover:text-cream"
+                  onClick={() => navigate('/write')}
+                >
+                  write your first one.
+                </span>
+              </>
+            )}
           </p>
         </motion.div>
       ) : (
         <div className="relative">
           <div className="absolute left-3 top-0 bottom-0 w-px bg-dusty/20" />
           <div className="space-y-6 pl-10">
-            {entries.map((entry, i) => {
+            {filteredEntries.map((entry, i) => {
               const reflection = reflections[entry.id]
               return (
                 <motion.div
