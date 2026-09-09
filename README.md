@@ -6,7 +6,7 @@
 
 > sole developer — concept, design, frontend, backend, AI pipeline, deployment
 
-*a solo full-stack AI project — designed, built, and deployed in 5 weeks*
+*a solo full-stack AI project — designed, built, and deployed in 2 weeks*
 
 **[→ try it live](https://dear-brain.vercel.app)**
 
